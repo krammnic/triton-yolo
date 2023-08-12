@@ -2,8 +2,6 @@
 Deployment of quantized TRT object detection models on Triton inference server
 
 ### Prepare the TRT engines 
-The engine building code is based on https://github.com/NVIDIA/TensorRT/tree/main/samples/python/efficientdet, with modifications to fit with TensorRT8 and change the preprocess function in INT8 calibrator for Yolo and Resnet models.
-
 Prepare the ONNX models in advance. For example, ```yolov5s.onnx``` model can be exported by using ```export.py``` in ```ultralytics/yolov5```.
 To build the engine and post-training-quantization (PTQ) model, go to ```build_quantized_engine/``` and execute:
 #### For FP16:
@@ -50,11 +48,52 @@ TRT (int8)    |   1.12ms           |   28.65
 -----------------------------------------------------------------
 ```
 
+### Ubuntu installation guide
+
+Install docker:
+```commandline
+sudo apt-get update
+sudo apt-get install ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+Install nvidia-docker:
+```commandline
+docker volume ls -q -f driver=nvidia-docker | xargs -r -I{} -n1 docker ps -q -a -f volume={} | xargs -r docker rm -f
+sudo apt-get purge nvidia-docker
+curl https://get.docker.com | sh
+
+sudo systemctl start docker && sudo systemctl enable docker
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+
+curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+
+curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+sudo apt-get update
+
+sudo apt-get install -y nvidia-docker2
+```
+
+Restart docker:
+
+```sudo systemctl restart docker```
+
 ### Run Triton server: 
 
-```cd triton-trt-object-detection/```
-
-```docker run --gpus=all --rm --net=host -v ${PWD}/model_deploy:/models nvcr.io/nvidia/tritonserver:22.12-py3 tritonserver --model-repository=/models --disable-auto-complete-config```
+```
+cd triton-trt-object-detection/
+docker run --gpus=all --rm --net=host -v ${PWD}/model_deploy:/models nvcr.io/nvidia/tritonserver:22.12-py3 tritonserver --model-repository=/models --disable-auto-complete-config
+```
 
 ### Run client:
 Requires installing ```opencv-python``` and ```tritonclient[all]``` packages by pip in advance .
